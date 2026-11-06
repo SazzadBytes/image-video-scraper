@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: image-video-scraper
+    runtime: docker
+    plan: free
+    region: oregon
+    buildCommand: ""
+    startCommand: "python app.py"
+    envVars:
+      - key: PORT
+        value: 8080

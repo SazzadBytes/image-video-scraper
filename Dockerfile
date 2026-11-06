@@ -20,3 +20,4 @@ EXPOSE 8080
 
 # Run the Flask app with host 0.0.0.0
 CMD ["python", "app.py"]
+
