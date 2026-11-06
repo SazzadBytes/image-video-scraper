@@ -100,3 +100,4 @@ The developers are not responsible for how this tool is used.
 ## 📄 License
 
 MIT License — feel free to use, modify, and distribute.
+
