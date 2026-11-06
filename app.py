@@ -73,19 +73,19 @@ def format_duration(seconds):
 
 # ─── Image Scraping ─────────────────────────────────────────────
 
-def scrape_image_urls(topic: str, count: int) -> list[str]:
-    """Scrape image URLs from Bing Image Search."""
-    urls = []
+def scrape_image_urls(topic: str, count: int) -> list[dict]:
+    """Scrape image items from Bing Image Search (both high-res murl and reliable turl fallback)."""
+    items = []
     seen = set()
 
-    for offset in range(0, count * 4, 35):
-        if len(urls) >= count * 2:
+    for offset in range(0, max(count * 3, 35), 35):
+        if len(items) >= count * 2:
             break
 
         search_url = (
             f"https://www.bing.com/images/search"
             f"?q={urllib.parse.quote(topic)}"
-            f"&first={offset}&count=35&qft=+filterui:photo-photo"
+            f"&first={offset}&count=35"
         )
 
         try:
@@ -96,74 +96,75 @@ def scrape_image_urls(topic: str, count: int) -> list[str]:
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Extract from 'm' attribute (JSON data in <a> tags)
+        # Extract strictly from 'iusc' search result anchors
         for a_tag in soup.find_all("a", {"class": "iusc"}):
             m_attr = a_tag.get("m")
-            if m_attr:
-                match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
-                if match:
-                    img_url = match.group(1)
-                    if img_url not in seen and img_url.startswith("http"):
-                        seen.add(img_url)
-                        urls.append(img_url)
+            if not m_attr:
+                continue
+            murl_match = re.search(r'"murl"\s*:\s*"([^"]+)"', m_attr)
+            turl_match = re.search(r'"turl"\s*:\s*"([^"]+)"', m_attr)
 
-        # Fallback: look for image tags
-        for img_tag in soup.find_all("img"):
-            for attr in ["data-src", "src", "data-src2"]:
-                img_url = img_tag.get(attr, "")
-                if img_url and img_url.startswith("http") and any(
-                    ext in img_url.lower()
-                    for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp"]
-                ):
-                    if img_url not in seen:
-                        seen.add(img_url)
-                        urls.append(img_url)
+            murl = murl_match.group(1) if murl_match else None
+            turl = turl_match.group(1) if turl_match else None
 
-        time.sleep(0.3)
+            # Skip if already seen or invalid
+            key = murl or turl
+            if not key or key in seen:
+                continue
 
-    return urls
+            seen.add(key)
+            items.append({"murl": murl, "turl": turl})
+
+        time.sleep(0.2)
+
+    return items
 
 
-def download_image(url: str, save_path: Path, index: int) -> str | None:
-    """Download a single image. Returns the filename on success."""
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=12, stream=True)
-        resp.raise_for_status()
+def download_image(item: dict, save_path: Path, index: int) -> str | None:
+    """
+    Download a single image. Tries the full-res 'murl' first;
+    if blocked or failed, falls back to the reliable Microsoft CDN 'turl'.
+    """
+    candidates = []
+    if item.get("murl"):
+        candidates.append(item["murl"])
+    if item.get("turl") and item["turl"] not in candidates:
+        candidates.append(item["turl"])
 
-        content_type = resp.headers.get("Content-Type", "")
-        if "image" not in content_type and not any(
-            ext in url.lower()
-            for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"]
-        ):
-            return None
-
-        img_data = resp.content
-        if len(img_data) < 1024:
-            return None
-
-        ext = ".jpg"
-        if "png" in content_type or url.lower().endswith(".png"):
-            ext = ".png"
-        elif "webp" in content_type or url.lower().endswith(".webp"):
-            ext = ".webp"
-        elif "gif" in content_type or url.lower().endswith(".gif"):
-            ext = ".gif"
-
-        # Validate image
+    for url in candidates:
         try:
+            resp = requests.get(url, headers=HEADERS, timeout=8, stream=True)
+            if resp.status_code != 200:
+                continue
+
+            content_type = resp.headers.get("Content-Type", "").lower()
+            img_data = resp.content
+            if len(img_data) < 1000:
+                continue
+
+            # Determine extension
+            ext = ".jpg"
+            if "png" in content_type or ".png" in url.lower():
+                ext = ".png"
+            elif "webp" in content_type or ".webp" in url.lower():
+                ext = ".webp"
+            elif "gif" in content_type or ".gif" in url.lower():
+                ext = ".gif"
+
+            # Validate image integrity
             img = Image.open(BytesIO(img_data))
             img.verify()
+
+            filename = f"image_{index:03d}{ext}"
+            with open(save_path / filename, "wb") as f:
+                f.write(img_data)
+
+            return filename
+
         except Exception:
-            return None
+            continue
 
-        filename = f"image_{index:03d}{ext}"
-        with open(save_path / filename, "wb") as f:
-            f.write(img_data)
-
-        return filename
-
-    except Exception:
-        return None
+    return None
 
 
 # ─── Video Search (yt-dlp) ──────────────────────────────────────
@@ -289,12 +290,12 @@ def scrape():
     # ── Scrape & download images ──
     images = []
     if image_count > 0:
-        image_urls = scrape_image_urls(topic, image_count)
+        image_items = scrape_image_urls(topic, image_count)
         idx = 1
-        for url in image_urls:
+        for item in image_items:
             if len(images) >= image_count:
                 break
-            filename = download_image(url, save_path, idx)
+            filename = download_image(item, save_path, idx)
             if filename:
                 images.append({"filename": filename, "index": idx})
                 idx += 1
