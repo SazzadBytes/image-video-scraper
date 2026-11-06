@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image & Video Scraper</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0b0b14;
+            --card: rgba(255,255,255,0.035);
+            --card-border: rgba(255,255,255,0.07);
+            --card-hover: rgba(255,255,255,0.06);
+            --text: #e0e0ee;
+            --text-dim: #7a7a96;
+            --accent: #818cf8;
+            --accent2: #a78bfa;
+            --green: #34d399;
+            --green-bg: rgba(52,211,153,0.12);
+            --red: #f87171;
+            --radius: 14px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(ellipse at 20% 40%, rgba(99,102,241,0.07) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(168,85,247,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 90%, rgba(59,130,246,0.05) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        .container { max-width: 1050px; margin: 0 auto; padding: 36px 20px; }
+
+        /* ── Header ── */
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 {
+            font-size: 2.6rem; font-weight: 800; letter-spacing: -1px;
+            background: linear-gradient(135deg, #818cf8, #a78bfa, #c084fc);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .header p { font-size: 1.05rem; color: var(--text-dim); margin-top: 8px; }
+
+        /* ── Card ── */
+        .card {
+            background: var(--card); border: 1px solid var(--card-border);
+            border-radius: 20px; padding: 32px; backdrop-filter: blur(16px);
+            margin-bottom: 28px; transition: border-color .3s;
+        }
+        .card:hover { border-color: rgba(129,140,248,0.18); }
+
+        /* ── Form ── */
+        .form-grid {
+            display: grid; grid-template-columns: 1fr 120px 120px auto;
+            gap: 14px; align-items: end;
+        }
+        label { display: block; font-size: .78rem; font-weight: 600; color: #9a9ab8; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 7px; }
+        input {
+            width: 100%; padding: 13px 16px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 11px; color: #fff; font-size: .95rem; font-family: inherit;
+            outline: none; transition: all .25s;
+        }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(129,140,248,0.13); }
+        input::placeholder { color: #44445a; }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 13px 28px; border: none; border-radius: 11px;
+            font-size: .92rem; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: all .25s; white-space: nowrap;
+        }
+        .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.35); }
+        .btn-green {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff;
+        }
+        .btn-green:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(16,185,129,0.3); }
+        .btn-outline {
+            background: transparent; border: 1px solid rgba(255,255,255,0.12);
+            color: #b0b0cc; font-size: .82rem; padding: 8px 16px; border-radius: 8px;
+        }
+        .btn-outline:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .btn-outline.active { border-color: var(--accent); color: var(--accent); background: rgba(129,140,248,0.08); }
+
+        /* ── Spinner ── */
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff;
+            border-radius: 50%; animation: spin .6s linear infinite;
+            vertical-align: middle; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Progress ── */
+        .progress-wrap {
+            background: rgba(255,255,255,0.04); border-radius: 8px;
+            height: 6px; overflow: hidden; margin-bottom: 10px;
+        }
+        .progress-fill {
+            height: 100%; border-radius: 8px; width: 0%;
+            background: linear-gradient(90deg, #6366f1, #a78bfa, #c084fc);
+            transition: width .4s ease;
+        }
+        .progress-text { text-align: center; font-size: .88rem; color: var(--text-dim); }
+        .progress-text b { color: var(--accent2); }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            margin-bottom: 20px; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .toolbar-left { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+        .toolbar-right { display: flex; gap: 10px; align-items: center; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px; font-size: .82rem; font-weight: 600;
+        }
+        .badge-purple { background: rgba(129,140,248,0.12); color: var(--accent); }
+        .badge-green { background: var(--green-bg); color: var(--green); }
+
+        /* ── Section Headers ── */
+        .section-title {
+            font-size: 1.1rem; font-weight: 700; color: #c0c0d8;
+            margin: 24px 0 14px; display: flex; align-items: center; gap: 10px;
+        }
+        .section-title .count { font-size: .85rem; color: var(--text-dim); font-weight: 500; }
+
+        /* ── Image Grid ── */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px; margin-bottom: 28px;
+        }
+        .grid-card {
+            position: relative; border-radius: var(--radius); overflow: hidden;
+            background: rgba(255,255,255,0.025); border: 2px solid transparent;
+            aspect-ratio: 1; cursor: pointer; transition: all .25s;
+        }
+        .grid-card.selected { border-color: var(--accent); }
+        .grid-card.deselected { opacity: .35; border-color: rgba(255,255,255,0.05); }
+        .grid-card.deselected:hover { opacity: .6; }
+        .grid-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.3); }
+        .grid-card img, .grid-card .thumb {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .grid-card .check {
+            position: absolute; top: 10px; right: 10px;
+            width: 26px; height: 26px; border-radius: 7px;
+            border: 2px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            transition: all .2s; z-index: 2;
+        }
+        .grid-card.selected .check {
+            background: var(--accent); border-color: var(--accent);
+        }
+        .grid-card.selected .check::after {
+            content: '✓'; color: #fff; font-size: 14px; font-weight: 700;
+        }
+        .grid-card .overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(transparent 50%, rgba(0,0,0,0.75));
+            opacity: 0; transition: opacity .25s; z-index: 1;
+        }
+        .grid-card:hover .overlay { opacity: 1; }
+        .grid-card .label {
+            position: absolute; bottom: 10px; left: 10px; right: 10px;
+            font-size: .78rem; color: rgba(255,255,255,0.85);
+            z-index: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            opacity: 0; transition: opacity .25s;
+        }
+        .grid-card:hover .label { opacity: 1; }
+
+        /* ── Video Card extras ── */
+        .grid.videos { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+        .grid.videos .grid-card { aspect-ratio: 16/9; }
+        .video-play {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 44px; height: 44px; background: rgba(0,0,0,0.6);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            z-index: 2; pointer-events: none;
+        }
+        .video-play::after {
+            content: ''; width: 0; height: 0;
+            border-top: 9px solid transparent; border-bottom: 9px solid transparent;
+            border-left: 15px solid #fff; margin-left: 3px;
+        }
+        .duration-badge {
+            position: absolute; bottom: 10px; right: 10px;
+            background: rgba(0,0,0,0.75); padding: 3px 8px; border-radius: 5px;
+            font-size: .72rem; font-weight: 600; color: #fff; z-index: 2;
+        }
+        .video-title {
+            position: absolute; bottom: 10px; left: 10px; right: 60px;
+            font-size: .75rem; color: rgba(255,255,255,0.9);
+            z-index: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* ── Status / Empty ── */
+        .status-box {
+            text-align: center; padding: 48px 20px; border-radius: var(--radius);
+        }
+        .status-box.error { color: var(--red); }
+
+        /* ── Download Banner ── */
+        .download-banner {
+            background: var(--green-bg); border: 1px solid rgba(52,211,153,0.2);
+            border-radius: var(--radius); padding: 24px 28px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 20px; flex-wrap: wrap; gap: 16px;
+        }
+        .download-banner .info h3 { color: var(--green); font-size: 1.1rem; }
+        .download-banner .info p { color: var(--text-dim); font-size: .88rem; margin-top: 4px; }
+
+        /* ── Responsive ── */
+        @media (max-width: 700px) {
+            .header h1 { font-size: 1.9rem; }
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            .form-grid > div:first-child { grid-column: 1 / -1; }
+            .card { padding: 22px; }
+            .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+            .grid.videos { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+            .toolbar { flex-direction: column; align-items: stretch; }
+            .toolbar-right { justify-content: stretch; }
+        }
+
+        /* ── Fade-in ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .grid-card { animation: fadeUp .35s ease both; }
+
+        /* Hidden */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Header -->
+    <div class="header">
+        <h1>🖼️ Image & Video Scraper</h1>
+        <p>Search a topic, preview results, select what you want, and download</p>
+    </div>
+
+    <!-- ─── Phase 1: Search Form ─── -->
+    <div class="card" id="searchCard">
+        <form id="searchForm" class="form-grid">
+            <div>
+                <label for="topic">Topic / Search Query</label>
+                <input type="text" id="topic" placeholder="e.g. sunset over mountains" required autocomplete="off">
+            </div>
+            <div>
+                <label for="imageCount">Images</label>
+                <input type="number" id="imageCount" value="10" min="0" max="100">
+            </div>
+            <div>
+                <label for="videoCount">Videos</label>
+                <input type="number" id="videoCount" value="5" min="0" max="20">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary" id="searchBtn">Search</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ─── Scraping Progress ─── -->
+    <div id="scrapeProgress" class="hidden" style="margin-bottom: 24px;">
+        <div class="progress-wrap"><div class="progress-fill" id="scrapeFill"></div></div>
+        <p class="progress-text" id="scrapeText">Scraping…</p>
+    </div>
+
+    <!-- ─── Phase 2: Preview & Select ─── -->
+    <div id="previewSection" class="hidden">
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button class="btn btn-outline" onclick="selectAll('image')">Select All Images</button>
+                <button class="btn btn-outline" onclick="deselectAll('image')">Deselect All Images</button>
+                <button class="btn btn-outline" onclick="selectAll('video')">Select All Videos</button>
+                <button class="btn btn-outline" onclick="deselectAll('video')">Deselect All Videos</button>
+            </div>
+            <div class="toolbar-right">
+                <span class="badge badge-purple" id="selectedCount">0 selected</span>
+                <button class="btn btn-green" id="downloadBtn" onclick="downloadSelected()">
+                    ⬇ Download Selected
+                </button>
+            </div>
+        </div>
+
+        <!-- Images -->
+        <div id="imagesSection" class="hidden">
+            <div class="section-title">
+                🖼️ Images <span class="count" id="imgCount"></span>
+            </div>
+            <div class="grid" id="imagesGrid"></div>
+        </div>
+
+        <!-- Videos -->
+        <div id="videosSection" class="hidden">
+            <div class="section-title">
+                🎬 Videos <span class="count" id="vidCount"></span>
+            </div>
+            <div class="grid videos" id="videosGrid"></div>
+        </div>
+    </div>
+
+    <!-- ─── Phase 3: Download Progress ─── -->
+    <div id="downloadProgress" class="hidden" style="margin-top: 20px;">
+        <div class="progress-wrap"><div class="progress-fill" id="dlFill"></div></div>
+        <p class="progress-text" id="dlText">Preparing download…</p>
+    </div>
+
+    <!-- ─── Phase 4: Download Complete ─── -->
+    <div id="downloadBanner" class="hidden"></div>
+
+</div>
+
+<script>
+/* ──────────── State ──────────── */
+let sessionId = '';
+let imageItems = [];   // { filename, selected }
+let videoItems = [];   // { id, title, url, thumbnail, duration, channel, selected }
+
+/* ──────────── DOM refs ──────────── */
+const $ = id => document.getElementById(id);
+
+/* ──────────── Search ──────────── */
+$('searchForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const topic = $('topic').value.trim();
+    const imageCount = parseInt($('imageCount').value) || 0;
+    const videoCount = parseInt($('videoCount').value) || 0;
+
+    if (!topic) return;
+    if (imageCount === 0 && videoCount === 0) return alert('Enter at least 1 image or video');
+
+    // Reset
+    $('previewSection').classList.add('hidden');
+    $('downloadBanner').classList.add('hidden');
+    $('downloadProgress').classList.add('hidden');
+
+    // Show progress
+    const btn = $('searchBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Scraping…';
+    $('scrapeProgress').classList.remove('hidden');
+    $('scrapeFill').style.width = '15%';
+    $('scrapeText').innerHTML = `Searching for <b>"${topic}"</b>…`;
+
+    try {
+        const resp = await fetch('/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, imageCount, videoCount }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Scraping failed');
+
+        $('scrapeFill').style.width = '100%';
+        $('scrapeText').innerHTML = `Found <b>${data.images.length}</b> images and <b>${data.videos.length}</b> videos`;
+
+        sessionId = data.sessionId;
+        imageItems = data.images.map(img => ({ ...img, selected: true }));
+        videoItems = data.videos.map(vid => ({ ...vid, selected: true }));
+
+        renderPreview();
+
+    } catch (err) {
+        $('scrapeFill').style.width = '100%';
+        $('scrapeFill').style.background = 'var(--red)';
+        $('scrapeText').textContent = '❌ ' + err.message;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Search';
+    }
+});
+
+/* ──────────── Render Preview ──────────── */
+function renderPreview() {
+    // Images
+    if (imageItems.length > 0) {
+        $('imagesSection').classList.remove('hidden');
+        $('imgCount').textContent = `(${imageItems.length} found)`;
+        let html = '';
+        imageItems.forEach((img, i) => {
+            html += `
+                <div class="grid-card selected" data-type="image" data-index="${i}"
+                     style="animation-delay:${i * 0.04}s" onclick="toggleItem('image', ${i})">
+                    <img src="/image/${encodeURIComponent(sessionId)}/${encodeURIComponent(img.filename)}" alt="" loading="lazy">
+                    <div class="check"></div>
+                    <div class="overlay"></div>
+                    <div class="label">#${i + 1} — ${img.filename}</div>
+                </div>`;
+        });
+        $('imagesGrid').innerHTML = html;
+    } else {
+        $('imagesSection').classList.add('hidden');
+    }
+
+    // Videos
+    if (videoItems.length > 0) {
+        $('videosSection').classList.remove('hidden');
+        $('vidCount').textContent = `(${videoItems.length} found)`;
+        let html = '';
+        videoItems.forEach((vid, i) => {
+            html += `
+                <div class="grid-card selected" data-type="video" data-index="${i}"
+                     style="animation-delay:${i * 0.06}s" onclick="toggleItem('video', ${i})">
+                    <img class="thumb" src="${vid.thumbnail}" alt="" loading="lazy"
+                         onerror="this.style.background='#1a1a2e'">
+                    <div class="check"></div>
+                    <div class="video-play"></div>
+                    ${vid.duration ? `<span class="duration-badge">${vid.duration}</span>` : ''}
+                    <div class="video-title">${escHtml(vid.title)}</div>
+                </div>`;
+        });
+        $('videosGrid').innerHTML = html;
+    } else {
+        $('videosSection').classList.add('hidden');
+    }
+
+    updateCounts();
+    $('previewSection').classList.remove('hidden');
+}
+
+/* ──────────── Toggle / Select / Deselect ──────────── */
+function toggleItem(type, index) {
+    const items = type === 'image' ? imageItems : videoItems;
+    items[index].selected = !items[index].selected;
+
+    const card = document.querySelector(`.grid-card[data-type="${type}"][data-index="${index}"]`);
+    card.classList.toggle('selected', items[index].selected);
+    card.classList.toggle('deselected', !items[index].selected);
+
+    updateCounts();
+}
+
+function selectAll(type) {
+    const items = type === 'image' ? imageItems : videoItems;
+    items.forEach((it, i) => {
+        it.selected = true;
+        const card = document.querySelector(`.grid-card[data-type="${type}"][data-index="${i}"]`);
+        if (card) { card.classList.add('selected'); card.classList.remove('deselected'); }
+    });
+    updateCounts();
+}
+
+function deselectAll(type) {
+    const items = type === 'image' ? imageItems : videoItems;
+    items.forEach((it, i) => {
+        it.selected = false;
+        const card = document.querySelector(`.grid-card[data-type="${type}"][data-index="${i}"]`);
+        if (card) { card.classList.remove('selected'); card.classList.add('deselected'); }
+    });
+    updateCounts();
+}
+
+function updateCounts() {
+    const selImg = imageItems.filter(i => i.selected).length;
+    const selVid = videoItems.filter(v => v.selected).length;
+    const total = selImg + selVid;
+    $('selectedCount').textContent = `${total} selected`;
+    $('downloadBtn').disabled = total === 0;
+    $('downloadBtn').textContent = `⬇ Download Selected (${total})`;
+}
+
+/* ──────────── Download Selected ──────────── */
+async function downloadSelected() {
+    const selectedImages = imageItems.filter(i => i.selected).map(i => i.filename);
+    const selectedVideos = videoItems.filter(v => v.selected).map(v => ({
+        url: v.url, title: v.title, id: v.id
+    }));
+
+    if (selectedImages.length === 0 && selectedVideos.length === 0) return;
+
+    const btn = $('downloadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Downloading…';
+
+    $('downloadProgress').classList.remove('hidden');
+    $('downloadBanner').classList.add('hidden');
+    $('dlFill').style.width = '10%';
+    $('dlFill').style.background = '';
+    $('dlText').innerHTML = selectedVideos.length > 0
+        ? `Downloading <b>${selectedVideos.length}</b> video(s)… this may take a minute`
+        : 'Packaging files…';
+
+    try {
+        const resp = await fetch('/download-selected', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId, selectedImages, selectedVideos }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Download failed');
+
+        $('dlFill').style.width = '100%';
+        $('dlText').innerHTML = `✅ Packaged <b>${data.totalItems}</b> files`;
+
+        // Show banner
+        const failedVids = (data.videoResults || []).filter(v => !v.success);
+        let note = '';
+        if (failedVids.length > 0) {
+            note = `<br><span style="color:var(--red);font-size:.82rem">${failedVids.length} video(s) could not be downloaded</span>`;
+        }
+
+        $('downloadBanner').innerHTML = `
+            <div class="download-banner">
+                <div class="info">
+                    <h3>✅ Ready to download!</h3>
+                    <p>${data.imageCount} image(s) + ${data.videoCount} video(s) packaged${note}</p>
+                </div>
+                <a href="${data.downloadUrl}" class="btn btn-green" download>⬇ Download ZIP</a>
+            </div>`;
+        $('downloadBanner').classList.remove('hidden');
+
+    } catch (err) {
+        $('dlFill').style.width = '100%';
+        $('dlFill').style.background = 'var(--red)';
+        $('dlText').textContent = '❌ ' + err.message;
+    } finally {
+        btn.disabled = false;
+        updateCounts();
+    }
+}
+
+/* ──────────── Utils ──────────── */
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+</body>
+</html>
