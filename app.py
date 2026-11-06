@@ -395,7 +395,8 @@ def download_zip(folder):
 # ─── Main ────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
     print("\n" + "=" * 58)
-    print("  🖼️  Image & Video Scraper — http://localhost:8080")
+    print(f"  🖼️  Image & Video Scraper running on port {port}")
     print("=" * 58 + "\n")
-    app.run(debug=True, host="0.0.0.0", port=8080)
+    app.run(debug=False, host="0.0.0.0", port=port)

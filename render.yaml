@@ -1,11 +1,10 @@
 services:
   - type: web
     name: image-video-scraper
-    runtime: docker
+    env: python
     plan: free
-    region: oregon
-    buildCommand: ""
-    startCommand: "python app.py"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app --workers 2 --timeout 180 --bind 0.0.0.0:$PORT"
     envVars:
-      - key: PORT
-        value: 8080
+      - key: PYTHON_VERSION
+        value: 3.11.0

@@ -6,6 +6,13 @@ A web app that scrapes images and videos from the internet based on a topic — 
 ![Flask](https://img.shields.io/badge/Flask-3.x-green?logo=flask&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+## ☁️ 1-Click Cloud Deployment (Free 24/7 Hosting)
+
+Deploy directly to the cloud without keeping your computer on:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SazzadBytes/image-video-scraper)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?template=https://github.com/SazzadBytes/image-video-scraper)
+
 ## ✨ Features
 
 - **🔍 Topic-based search** — Enter any topic and specify how many images & videos you want
